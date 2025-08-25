@@ -211,7 +211,7 @@ def choose_dir_gui() -> Path | None:
         from tkinter import filedialog
         root = tk.Tk()
         root.withdraw()
-    dir_path = filedialog.askdirectory(title="Select output folder")
+        dir_path = filedialog.askdirectory(title="Select output folder")
         root.destroy()
         return Path(dir_path) if dir_path else None
     except Exception as e:
