@@ -27,28 +27,47 @@ except Exception:  # fallback to no-colors
 
 APP_NAME = "PDF Minner"
 
+# Cache for banner rendering (avoids re-rendering on each frame)
+_BANNER_CACHE: str | None = None
+
 
 def clear_screen() -> None:
-    # Clear + move cursor home + set white background and black text
-    sys.stdout.write("\x1b[2J\x1b[H\x1b[107m\x1b[30m")
+    # Clear + move cursor home + set black background and magenta text
+    sys.stdout.write("\x1b[2J\x1b[H\x1b[40m\x1b[35m")
     sys.stdout.flush()
 
 
 def banner() -> str:
-    title = r"""
+    global _BANNER_CACHE
+    if _BANNER_CACHE is not None:
+        return _BANNER_CACHE
+
+    # Prefer pyfiglet for ASCII art, gracefully fallback
+    try:
+        from pyfiglet import Figlet  # type: ignore
+        cols, _ = term_size()
+        f = Figlet(font="slant", width=max(60, cols))
+        title = f.renderText(APP_NAME)
+    except Exception:
+        title = r"""
    ____  ______ _____     __  __ _       _                
   |  _ \|  ____|  __ \   |  \/  (_)     | |               
   | |_) | |__  | |  | |  | \  / |_ _ __ | | _____ _ __    
   |  _ <|  __| | |  | |  | |\/| | | '_ \| |/ / _ \ '__|   
   | |_) | |____| |__| |  | |  | | | | | |   <  __/ |      
   |____/|______|_____/   |_|  |_|_|_| |_|_|\_\___|_|      
-                                                         
-             PDF → Markdown (Screenplay-aware)
 """
-    box_top = f"{Fore.CYAN}{Style.BRIGHT}┌{'─'*50}┐{Style.NORMAL}"
-    box_mid = f"{Fore.CYAN}{Style.BRIGHT}│{Style.NORMAL}   {Fore.MAGENTA}{APP_NAME}{Style.NORMAL} — Basit ve Hızlı{' '*(50-26)}{Fore.CYAN}{Style.BRIGHT}│{Style.NORMAL}"
-    box_bot = f"{Fore.CYAN}{Style.BRIGHT}└{'─'*50}┘{Style.NORMAL}"
-    return f"{Fore.BLACK}{title}\n{box_top}\n{box_mid}\n{box_bot}{Style.NORMAL}"
+
+    tagline = "PDF → Markdown (Screenplay-aware)"
+    box_top = f"{Fore.MAGENTA}{Style.BRIGHT}┌{'─'*50}┐{Style.NORMAL}"
+    box_mid = (
+        f"{Fore.MAGENTA}{Style.BRIGHT}│{Style.NORMAL}   "
+        f"{Fore.MAGENTA}{APP_NAME}{Style.NORMAL} — Basit ve Hızlı"
+        f"{' '*(50-26)}{Fore.MAGENTA}{Style.BRIGHT}│{Style.NORMAL}"
+    )
+    box_bot = f"{Fore.MAGENTA}{Style.BRIGHT}└{'─'*50}┘{Style.NORMAL}"
+    _BANNER_CACHE = f"{Fore.MAGENTA}{title}{tagline}\n\n{box_top}\n{box_mid}\n{box_bot}{Style.NORMAL}"
+    return _BANNER_CACHE
 
 
 def hide_cursor():
@@ -72,6 +91,13 @@ def term_size():
 
 def splash_rain_lightning(duration: float = 2.5) -> None:
     import random
+    # Optional: Windows key detection for early exit
+    try:
+        import msvcrt  # type: ignore
+        has_kb = True
+    except Exception:
+        msvcrt = None  # type: ignore
+        has_kb = False
     cols, rows = term_size()
     rows = max(10, rows - 2)
     drops = []  # list of (x, y)
@@ -82,6 +108,13 @@ def splash_rain_lightning(duration: float = 2.5) -> None:
     hide_cursor()
     try:
         while time.time() - start < duration:
+            # Early exit on key (Windows)
+            if has_kb and msvcrt.kbhit():  # type: ignore
+                try:
+                    msvcrt.getch()  # consume
+                except Exception:
+                    pass
+                break
             clear_screen()
             # spawn new drops
             for _ in range(density):
@@ -102,18 +135,26 @@ def splash_rain_lightning(duration: float = 2.5) -> None:
             # draw
             buf = []
             if flash:
-                buf.append(f"{Fore.YELLOW}{Style.BRIGHT}")
+                buf.append(f"{Fore.MAGENTA}{Style.BRIGHT}")
             else:
-                buf.append(f"{Fore.BLACK}{Style.NORMAL}")
+                buf.append(f"{Fore.MAGENTA}{Style.NORMAL}")
             # header line
             buf.append(banner())
             buf.append("\n")
             # rain field
             field = [[" "] * cols for _ in range(rows)]
             for x, y in drops:
-                ch = "|" if not flash else "⚡"
+                ch = "|" if not flash else "|"
                 if 0 <= y < rows and 0 <= x < cols:
                     field[y][x] = ch
+            # overlay centered prompt
+            msg = "Devam etmek için bir tuşa basın"
+            if len(msg) < cols:
+                y = rows // 2
+                sx = max(0, (cols - len(msg)) // 2)
+                for i, ch in enumerate(msg):
+                    if 0 <= sx + i < cols:
+                        field[y][sx + i] = ch
             for r in field:
                 line = "".join(r)
                 buf.append(line)
@@ -122,6 +163,12 @@ def splash_rain_lightning(duration: float = 2.5) -> None:
             time.sleep(0.08)
     finally:
         show_cursor()
+    # If not Windows, pause for Enter to honor the prompt
+    if not has_kb:
+        try:
+            input("Devam etmek için bir tuşa basın...")
+        except Exception:
+            pass
 
 
 def menu(selected_file: Path | None, output_dir: Path | None, remove_wm: bool) -> str:
@@ -469,9 +516,9 @@ def run_with_spinner(thread: threading.Thread, q: Queue) -> tuple[bool, str | No
         spin = SPINNER_FRAMES[idx % len(SPINNER_FRAMES)]
         idx += 1
         if percent is not None:
-            line = f" {Fore.CYAN}{spin}{Style.RESET_ALL} {status} — %{percent:3d}"
+            line = f" {Fore.MAGENTA}{spin}{Style.RESET_ALL} {status} — %{percent:3d}"
         else:
-            line = f" {Fore.CYAN}{spin}{Style.RESET_ALL} {status}"
+            line = f" {Fore.MAGENTA}{spin}{Style.RESET_ALL} {status}"
         print("\r" + line + " " * 20, end="", flush=True)
         time.sleep(0.08)
 
@@ -605,12 +652,16 @@ def main() -> int:
             clear_screen()
             print(banner())
             print(
-                "Basit PDF → Markdown dönüştürücü. Senaryo metinleri için sahne/karakter/"
-                "geçiş biçimlendirmesi uygular. Daha hızlı ve az bellek kullanımı için"
-                " sayfa bazlı çıkarım (pypdf) veya sistem pdftotext kullanılabilir."
+                "Basit ama işini iyi yapan bir PDF → Markdown dönüştürücü.\n"
+                "• Senaryo (screenplay) metinlerinde sahne/karakter/geçişleri akıllıca biçimler.\n"
+                "• Tekrarlayan kısa satırları tespit ederek filigranları temizlemeye yardımcı olur.\n\n"
+                "Mütevazı hedefimiz: PDF metinlerini daha okunur ve işlenir hale getirmek.\n"
+                "Özellikle yapay zekâ eğitimlerinde, ajan/LLM eğitim hatlarında veya veri işleme\n"
+                "akışlarında, hızlıca temiz metne ulaşmak ve basit bir Markdown çıktısıyla\n"
+                "ön işleme maliyetini azaltmak için tasarlandı."
             )
-            print("\nBağımlılık (opsiyonel): pdfminer.six, pypdf, Poppler(pdftotext)")
-            print("Filigran temizleme: sayfalar arası tekrar eden kısa satırları tespit edip kaldırır.")
+            print("\nOpsiyonel bağımlılıklar: pdfminer.six, pypdf, colorama, pyfiglet, Poppler(pdftotext)")
+            print("Filigran temizleme: sayfalar arası tekrar eden kısa satırları tespit edip kaldırmayı dener.")
             input("Geri dönmek için Enter...")
 
         elif choice == "6":

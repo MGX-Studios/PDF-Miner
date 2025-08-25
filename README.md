@@ -23,7 +23,7 @@ Uygulama etkileşimli bir menü ile gelir; PDF ve çıktı klasörünü görsel 
 
 2) (Önerilen) İsteğe bağlı bağımlılıkları kurun:
 ```
-pip install pdfminer.six pypdf colorama
+pip install pdfminer.six pypdf colorama pyfiglet
 ```
 
 3) Uygulamayı çalıştırın:
@@ -54,6 +54,7 @@ Biçimlendirme sezgiseldir; klasik PDF metinleri değişmeden basitçe `.md` ola
   - `pdfminer.six`
   - `pypdf`
   - `colorama` (renkli terminal çıktısı)
+  - `pyfiglet` (ASCII art başlık)
   - Poppler `pdftotext` (sistem aracısı; PATH’te bulunursa kullanılır)
 
 Not: `tkinter` çoğu Python dağıtımında yerleşik gelir; sisteminizde bulunmuyorsa işletim sisteminize uygun paketle kurmanız gerekebilir.
