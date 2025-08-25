@@ -62,7 +62,7 @@ def banner() -> str:
     box_top = f"{Fore.MAGENTA}{Style.BRIGHT}┌{'─'*50}┐{Style.NORMAL}"
     box_mid = (
         f"{Fore.MAGENTA}{Style.BRIGHT}│{Style.NORMAL}   "
-        f"{Fore.MAGENTA}{APP_NAME}{Style.NORMAL} — Basit ve Hızlı"
+        f"{Fore.MAGENTA}{APP_NAME}{Style.NORMAL} — Simple and Fast"
         f"{' '*(50-26)}{Fore.MAGENTA}{Style.BRIGHT}│{Style.NORMAL}"
     )
     box_bot = f"{Fore.MAGENTA}{Style.BRIGHT}└{'─'*50}┘{Style.NORMAL}"
@@ -148,7 +148,7 @@ def splash_rain_lightning(duration: float = 2.5) -> None:
                 if 0 <= y < rows and 0 <= x < cols:
                     field[y][x] = ch
             # overlay centered prompt
-            msg = "Devam etmek için bir tuşa basın"
+            msg = "Press any key to continue"
             if len(msg) < cols:
                 y = rows // 2
                 sx = max(0, (cols - len(msg)) // 2)
@@ -166,24 +166,24 @@ def splash_rain_lightning(duration: float = 2.5) -> None:
     # If not Windows, pause for Enter to honor the prompt
     if not has_kb:
         try:
-            input("Devam etmek için bir tuşa basın...")
+            input("Press Enter to continue...")
         except Exception:
             pass
 
 
 def menu(selected_file: Path | None, output_dir: Path | None, remove_wm: bool) -> str:
-    sf = str(selected_file) if selected_file else "(seçilmedi)"
-    od = str(output_dir) if output_dir else "(seçilmedi)"
-    wm = f"Açık" if remove_wm else "Kapalı"
+    sf = str(selected_file) if selected_file else "(not selected)"
+    od = str(output_dir) if output_dir else "(not selected)"
+    wm = "On" if remove_wm else "Off"
     return (
-        f"\n{Fore.YELLOW}Menü{Style.RESET_ALL}\n"
-        f"  1) PDF dosyası seç   : {Fore.GREEN}{sf}{Style.RESET_ALL}\n"
-        f"  2) Çıktı klasörü seç : {Fore.GREEN}{od}{Style.RESET_ALL}\n"
-        f"  3) Filigranı temizle : {Fore.CYAN}{wm}{Style.RESET_ALL}\n"
-        f"  4) Dönüştürmeyi başlat\n"
-        f"  5) Hakkında\n"
-        f"  6) Çıkış\n\n"
-        f"Seçiminiz (1-6): "
+        f"\n{Fore.YELLOW}Menu{Style.RESET_ALL}\n"
+        f"  1) Choose PDF file    : {Fore.GREEN}{sf}{Style.RESET_ALL}\n"
+        f"  2) Choose output folder: {Fore.GREEN}{od}{Style.RESET_ALL}\n"
+        f"  3) Remove watermark    : {Fore.CYAN}{wm}{Style.RESET_ALL}\n"
+        f"  4) Start conversion\n"
+        f"  5) About\n"
+        f"  6) Exit\n\n"
+        f"Your choice (1-6): "
     )
 
 
@@ -195,13 +195,13 @@ def choose_pdf_gui() -> Path | None:
         root.withdraw()
         # filetypes only PDFs
         file_path = filedialog.askopenfilename(
-            title="PDF seç",
+            title="Select PDF",
             filetypes=[("PDF files", "*.pdf")],
         )
         root.destroy()
         return Path(file_path) if file_path else None
     except Exception as e:
-        print(f"GUI açılamadı: {e}")
+        print(f"GUI could not be opened: {e}")
         return None
 
 
@@ -211,11 +211,11 @@ def choose_dir_gui() -> Path | None:
         from tkinter import filedialog
         root = tk.Tk()
         root.withdraw()
-        dir_path = filedialog.askdirectory(title="Çıktı klasörü seç")
+    dir_path = filedialog.askdirectory(title="Select output folder")
         root.destroy()
         return Path(dir_path) if dir_path else None
     except Exception as e:
-        print(f"GUI açılamadı: {e}")
+        print(f"GUI could not be opened: {e}")
         return None
 
 
@@ -226,7 +226,7 @@ def extract_pdf_text(path: Path, progress: Queue | None = None) -> str:
     try:
         from pdfminer.high_level import extract_text  # type: ignore
         if progress:
-            progress.put(("status", "pdfminer ile çıkarılıyor"))
+            progress.put(("status", "extracting with pdfminer"))
         return extract_text(str(path))
     except Exception:
         pass
@@ -253,15 +253,15 @@ def extract_pdf_text(path: Path, progress: Queue | None = None) -> str:
     exe = _which("pdftotext")
     if exe:
         if progress:
-            progress.put(("status", "pdftotext ile çıkarılıyor"))
+            progress.put(("status", "extracting with pdftotext"))
         try:
             cp = subprocess.run([exe, "-layout", str(path), "-"], capture_output=True, check=True)
             return cp.stdout.decode("utf-8", errors="ignore")
         except Exception as e:
-            raise RuntimeError(f"pdftotext başarısız: {e}")
+            raise RuntimeError(f"pdftotext failed: {e}")
 
     raise RuntimeError(
-        "PDF metni çıkarılamadı. 'pdfminer.six' veya 'pypdf' kurun ya da PATH'te 'pdftotext' bulundurun."
+        "Failed to extract PDF text. Install 'pdfminer.six' or 'pypdf', or ensure 'pdftotext' exists in PATH."
     )
 
 
@@ -462,7 +462,7 @@ def remove_watermarks_by_selection(text: str, phrases: list[str]) -> str:
 
 def extract_only_worker(pdf_path: Path, q: Queue) -> None:
     try:
-        q.put(("status", "PDF okunuyor"))
+        q.put(("status", "Reading PDF"))
         txt = extract_pdf_text(pdf_path, progress=q)
         q.put(("text", txt))
     except Exception as e:
@@ -471,12 +471,12 @@ def extract_only_worker(pdf_path: Path, q: Queue) -> None:
 
 def convert_worker(pdf_path: Path, out_dir: Path, q: Queue, *, remove_wm: bool) -> None:
     try:
-        q.put(("status", "PDF okunuyor"))
+        q.put(("status", "Reading PDF"))
         txt = extract_pdf_text(pdf_path, progress=q)
         if remove_wm:
-            q.put(("status", "Filigran temizleniyor"))
+            q.put(("status", "Removing watermark"))
             txt, removed = remove_watermarks_from_text(txt)
-        q.put(("status", "Biçimleniyor"))
+        q.put(("status", "Formatting"))
         md = format_screenplay_md(txt) if detect_screenplay(txt) else txt
         out_dir.mkdir(parents=True, exist_ok=True)
         out_path = out_dir / (pdf_path.stem + ".md")
@@ -492,7 +492,7 @@ SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇",
 def run_with_spinner(thread: threading.Thread, q: Queue) -> tuple[bool, str | None]:
     idx = 0
     percent = None
-    status = "Hazır"
+    status = "Idle"
     while thread.is_alive():
         # Drain messages
         try:
@@ -565,38 +565,38 @@ def main() -> int:
             if f and f.suffix.lower() == ".pdf" and f.exists():
                 selected_file = f
             else:
-                print(f"{Fore.RED}Geçerli bir PDF seçilmedi.{Style.RESET_ALL}")
-                input("Devam için Enter...")
+                print(f"{Fore.RED}No valid PDF selected.{Style.RESET_ALL}")
+                input("Press Enter to continue...")
 
         elif choice == "2":
             d = choose_dir_gui()
             if d:
                 output_dir = d
             else:
-                print(f"{Fore.RED}Klasör seçilmedi.{Style.RESET_ALL}")
-                input("Devam için Enter...")
+                print(f"{Fore.RED}No folder selected.{Style.RESET_ALL}")
+                input("Press Enter to continue...")
 
         elif choice == "3":
             remove_wm = not remove_wm
 
         elif choice == "4":
             if not selected_file:
-                print(f"{Fore.RED}Önce bir PDF dosyası seçin.{Style.RESET_ALL}")
-                input("Devam için Enter...")
+                print(f"{Fore.RED}Please select a PDF file first.{Style.RESET_ALL}")
+                input("Press Enter to continue...")
                 continue
             if not output_dir:
-                # Varsayılan: kaynağın yanına
+                # Default: next to the source file
                 output_dir = selected_file.parent
 
             # 1) Extract text with spinner
-            print(f"\n{Fore.YELLOW}PDF okunuyor...{Style.RESET_ALL}")
+            print(f"\n{Fore.YELLOW}Reading PDF...{Style.RESET_ALL}")
             q: Queue = Queue()
             t = threading.Thread(target=extract_only_worker, args=(selected_file, q), daemon=True)
             t.start()
             ok, payload = run_with_spinner(t, q)
             if not ok or not payload:
-                print(f"{Fore.RED}Hata:{Style.RESET_ALL} {payload}")
-                input("Devam için Enter...")
+                print(f"{Fore.RED}Error:{Style.RESET_ALL} {payload}")
+                input("Press Enter to continue...")
                 continue
 
             text = payload
@@ -609,16 +609,16 @@ def main() -> int:
                 selected_phrases: list[str] = []
                 if ranked:
                     best, cnt = ranked[0]
-                    ans = input(f"\nOlası filigran: '{best}' (yaklaşık {cnt} sayfa). Temizlensin mi? [E/h]: ").strip().lower()
-                    if ans in ("e", "evet", "y", "yes", ""):  # default yes
+                    ans = input(f"\nPossible watermark: '{best}' (~{cnt} pages). Remove? [Y/n]: ").strip().lower()
+                    if ans in ("y", "yes", ""):  # default yes
                         selected_phrases = [best]
                     else:
-                        print("\nDiğer adaylar:")
+                        print("\nOther candidates:")
                         # show up to 20
                         show = ranked[:20]
                         for i, (s, c) in enumerate(show, start=1):
                             print(f"  {i:2d}) {s}  [{c}]")
-                        raw = input("Temizlenecek numaraları girin (örn: 1,3) veya özel metin girin (boş geç: hiçbiri): ").strip()
+                        raw = input("Enter numbers to remove (e.g., 1,3) or type custom phrases (empty: none): ").strip()
                         if raw:
                             if any(ch.isdigit() for ch in raw):
                                 picks: list[str] = []
@@ -636,40 +636,39 @@ def main() -> int:
                                 selected_phrases = [p.strip() for p in raw.split(';') if p.strip()]
 
                 if selected_phrases:
-                    print(f"\nFiligran temizleniyor: {', '.join(selected_phrases)}")
+                    print(f"\nRemoving watermark: {', '.join(selected_phrases)}")
                     text = remove_watermarks_by_selection(text, selected_phrases)
 
             # 3) Format and write
-            print(f"\n{Fore.YELLOW}Biçimleniyor ve yazılıyor...{Style.RESET_ALL}")
+            print(f"\n{Fore.YELLOW}Formatting and writing...{Style.RESET_ALL}")
             md = format_screenplay_md(text) if detect_screenplay(text) else text
             output_dir.mkdir(parents=True, exist_ok=True)
             out_path = output_dir / (selected_file.stem + ".md")
             out_path.write_text(md, encoding="utf-8")
-            print(f"{Fore.GREEN}Bitti:{Style.RESET_ALL} {out_path}")
-            input("Devam için Enter...")
+            print(f"{Fore.GREEN}Done:{Style.RESET_ALL} {out_path}")
+            input("Press Enter to continue...")
 
         elif choice == "5":
             clear_screen()
             print(banner())
             print(
-                "Basit ama işini iyi yapan bir PDF → Markdown dönüştürücü.\n"
-                "• Senaryo (screenplay) metinlerinde sahne/karakter/geçişleri akıllıca biçimler.\n"
-                "• Tekrarlayan kısa satırları tespit ederek filigranları temizlemeye yardımcı olur.\n\n"
-                "Mütevazı hedefimiz: PDF metinlerini daha okunur ve işlenir hale getirmek.\n"
-                "Özellikle yapay zekâ eğitimlerinde, ajan/LLM eğitim hatlarında veya veri işleme\n"
-                "akışlarında, hızlıca temiz metne ulaşmak ve basit bir Markdown çıktısıyla\n"
-                "ön işleme maliyetini azaltmak için tasarlandı."
+                "A small, practical PDF → Markdown converter.\n"
+                "• Formats screenplay-like text (scenes/characters/transitions) into simple Markdown.\n"
+                "• Can help remove short repeating lines that look like watermarks.\n\n"
+                "Goal: keep things readable and easy to process.\n"
+                "Helpful for AI/agent training or data pipelines when you just need clean text\n"
+                "and a lightweight Markdown output without big claims."
             )
-            print("\nOpsiyonel bağımlılıklar: pdfminer.six, pypdf, colorama, pyfiglet, Poppler(pdftotext)")
-            print("Filigran temizleme: sayfalar arası tekrar eden kısa satırları tespit edip kaldırmayı dener.")
-            input("Geri dönmek için Enter...")
+            print("\nOptional: pdfminer.six, pypdf, colorama, pyfiglet, Poppler(pdftotext)")
+            print("Watermark removal: tries to remove short repeating lines across pages.")
+            input("Press Enter to go back...")
 
         elif choice == "6":
-            print(f"{Fore.CYAN}Güle güle!{Style.RESET_ALL}")
+            print(f"{Fore.CYAN}Goodbye!{Style.RESET_ALL}")
             return 0
 
         else:
-            print(f"{Fore.RED}Geçersiz seçim.{Style.RESET_ALL}")
+            print(f"{Fore.RED}Invalid choice.{Style.RESET_ALL}")
             time.sleep(0.8)
 
 
@@ -677,5 +676,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except KeyboardInterrupt:
-        print("\nİptal edildi.")
+        print("\nCancelled.")
         raise SystemExit(130)
